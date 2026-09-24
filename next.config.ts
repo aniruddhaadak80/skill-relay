@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [{ source: "/api/skills/:id/skill.md", destination: "/api/skills/:id/markdown" }];
+  },
 };
 
 export default nextConfig;

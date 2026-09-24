@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { catalogSourceInfo, getCatalog } from "@/lib/catalog";
+import { catalogSourceInfo, getCatalog, getSkillBySlug } from "@/lib/catalog";
+import { buildCopyBundle } from "@/lib/skill-copy";
 import { scoreSkill } from "@/lib/engine";
 import { createPack, getStoreState, listPacks, updatePack, verifyAuditChain } from "@/lib/store";
 import { parseHarnesses, parsePackInput, readJson } from "@/lib/validation";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 const tools = [
   { name: "search_skills", description: "Search the public skills.sh signal index and return normalized records.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 96 } }, required: ["query"] } },
   { name: "resolve_skill", description: "Rank a public skill for a task and return explainable compatibility factors.", inputSchema: { type: "object", properties: { task: { type: "string" }, skillId: { type: "string" }, harnesses: { type: "array", items: { type: "string" } } }, required: ["task"] } },
+  { name: "get_skill", description: "Return one exact public skill record plus the canonical human/agent copy bundle.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  { name: "get_skill_markdown", description: "Return the safe metadata-only SKILL.md relay manifest for one exact skill.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
   { name: "create_relay_pack", description: "Create a persisted cross-harness relay pack.", inputSchema: { type: "object", properties: { name: { type: "string" }, task: { type: "string" }, selectedSkillId: { type: "string" }, selectedSkillName: { type: "string" }, harnesses: { type: "array", items: { type: "string" } }, notes: { type: "string" } }, required: ["name", "task", "selectedSkillId", "selectedSkillName"] } },
   { name: "update_relay_pack", description: "Update an existing persisted relay pack and append an audit event.", inputSchema: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, task: { type: "string" }, status: { type: "string" }, notes: { type: "string" } }, required: ["id"] } },
   { name: "list_relay_packs", description: "List persisted relay packs.", inputSchema: { type: "object", properties: {} } },
@@ -59,6 +62,14 @@ export async function POST(request: Request) {
       const skill = catalog.items[0];
       if (!skill) return NextResponse.json(jsonRpcError(id, -404, "No matching skill"));
       return NextResponse.json(jsonRpc(id, toolResult({ skill, ...scoreSkill(skill, task, harnesses.length ? harnesses : undefined) })));
+    }
+    if (name === "get_skill" || name === "get_skill_markdown") {
+      const reference = typeof args.id === "string" ? args.id : "";
+      if (!reference.trim()) return NextResponse.json(jsonRpcError(id, -32602, "id is required"));
+      const skill = await getSkillBySlug(reference);
+      if (!skill) return NextResponse.json(jsonRpcError(id, -404, "Skill not found"));
+      const copy = buildCopyBundle(skill);
+      return NextResponse.json(jsonRpc(id, toolResult(name === "get_skill_markdown" ? { id: skill.id, name: skill.name, markdown: copy.markdown, profileUrl: copy.profileUrl, sourceUrl: copy.sourceUrl, reviewRequired: true } : { skill, copy })));
     }
     if (name === "create_relay_pack") {
       const item = await createPack(parsePackInput(args));

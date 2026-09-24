@@ -1,6 +1,6 @@
 import { CATALOG_SOURCE, CATALOG_SOURCE_URL, CATALOG_TOTAL, FALLBACK_SKILLS, SKILLS_SH_SOURCE_URL, cloneFallbackSkills } from "./fallback";
 import { compatibilityForSkill } from "./engine";
-import type { CatalogResponse, Harness, SkillRecord, SourceKind } from "./types";
+import { HARNESSES, type CatalogResponse, type Harness, type SkillRecord, type SourceKind } from "./types";
 
 type SkillsShResponse = {
   skills?: Array<{
@@ -36,6 +36,9 @@ function normalizeSkillSh(item: NonNullable<SkillsShResponse["skills"]>[number])
   const name = text(item.name, slugFromId(id));
   const slug = slugFromId(text(item.skillId, name));
   const installs = typeof item.installs === "number" ? item.installs : 0;
+  const repository = source.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+  const githubUrl = source.includes("github.com/") || /^[^/]+\/[^/]+$/.test(repository) ? `https://github.com/${repository}` : "";
+  const owner = repository.split("/")[0] || source;
   return {
     id,
     slug,
@@ -44,9 +47,9 @@ function normalizeSkillSh(item: NonNullable<SkillsShResponse["skills"]>[number])
     category: "agent workflows",
     subcategory: "cross-harness",
     tags: ["agent", "mcp", "public-skill"],
-    author: source.split("/")[0] || source,
-    authorUrl: source.includes("github.com/") ? `https://github.com/${source.split("github.com/")[1]?.split("/")[0] || ""}` : "",
-    sourceUrl: source.includes("github.com/") ? `https://github.com/${source.split("github.com/")[1]?.split("/")[0] || ""}` : "",
+    author: owner,
+    authorUrl: githubUrl ? `https://github.com/${owner}` : "",
+    sourceUrl: githubUrl,
     catalogUrl: `https://skills.sh/${id}`,
     license: "See source",
     lastmod: new Date().toISOString().slice(0, 10),
@@ -154,9 +157,13 @@ export async function getCatalog(options: { query?: string; limit?: number; offs
 }
 
 export async function getSkillBySlug(slug: string, harnesses?: Harness[]): Promise<SkillRecord | null> {
-  const result = await getCatalog({ query: slug, limit: 24, harnesses });
-  const normalized = slug.toLowerCase();
-  return result.items.find((item) => item.slug === normalized || item.id.toLowerCase().endsWith(`/${normalized}`)) || result.items[0] || null;
+  const normalized = decodeURIComponent(slug).trim().toLowerCase();
+  if (!normalized) return null;
+  const result = await getCatalog({ query: normalized, limit: 96, harnesses });
+  const exact = result.items.find((item) => item.slug.toLowerCase() === normalized || item.id.toLowerCase().endsWith(`/${normalized}`));
+  if (exact) return exact;
+  const fallback = cloneFallbackSkills().find((item) => item.slug.toLowerCase() === normalized || item.id.toLowerCase().endsWith(`/${normalized}`));
+  return fallback ? withCompatibility(fallback, harnesses || [...HARNESSES]) : null;
 }
 
 export function catalogSourceInfo() {

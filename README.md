@@ -21,6 +21,7 @@
 
 - **179,054+ public skill records** surfaced through the ClaudSkills mirror, with live `skills.sh` search and a sealed offline fallback.
 - **Cross-harness relay paths** for Claude Code, Codex, OpenClaw, Hermes Agent, OpenCode, Gemini CLI, and Cursor.
+- **Copy-first skill bundles** with one-click SKILL.md, JSON, source URL, and agent-payload actions, complete with clipboard fallback and visible copied/error states.
 - **Explainable fit engine** with task alignment, freshness, provenance, adoption, harness coverage, and review-surface factors.
 - **Persistent relay packs** in Neon Postgres with real create, read, update, delete, export, and seed behavior.
 - **MCP-style JSON-RPC** with `initialize`, `tools/list`, search, scoring, audit verification, and mutating pack tools.
@@ -310,6 +311,15 @@ curl -X POST https://skill-relay-tau.vercel.app/api/engine \
 
 The response includes `score`, `recommendation`, `factors`, `compatibility`, and an `analysis-only` SHA-384 `seal`.
 
+### Copy a skill for a human or agent
+
+```bash
+curl https://skill-relay-tau.vercel.app/api/skills/frontend-design
+curl https://skill-relay-tau.vercel.app/api/skills/frontend-design/markdown
+```
+
+The JSON response includes the exact `copy` bundle. The Markdown endpoint returns a metadata-only `SKILL.md` manifest with source, license, profile, JSON, and install-path references. The UI exposes the same values as **Copy SKILL.md**, **Copy JSON**, **Copy source URL**, and **Copy agent payload**.
+
 ### Mutation proof: create → read back
 
 ```bash
@@ -326,7 +336,7 @@ Update and delete use `PATCH` and `DELETE` on `/api/packs/<id>`. Every mutation 
 
 - [`/api/openapi.json`](https://skill-relay-tau.vercel.app/api/openapi.json)
 - [`/api/feed`](https://skill-relay-tau.vercel.app/api/feed) — cached public feed
-- [`/api/skills/<slug>/skill.md`](https://skill-relay-tau.vercel.app/api/skills/frontend-design/skill.md) — metadata-only preview
+- [`/api/skills/<slug>/markdown`](https://skill-relay-tau.vercel.app/api/skills/frontend-design/markdown) — metadata-only Markdown copy bundle
 
 ## Agent setup
 
@@ -356,6 +366,8 @@ MCP tools:
 | --- | --- | --- |
 | `search_skills` | No | Search normalized public skill signals. |
 | `resolve_skill` | No | Return a ranked skill and explainable fit. |
+| `get_skill` | No | Return one exact skill plus JSON, Markdown, source, and agent-payload URLs. |
+| `get_skill_markdown` | No | Return the safe metadata-only SKILL.md manifest for one exact skill. |
 | `create_relay_pack` | Yes | Persist a new cross-harness pack. |
 | `update_relay_pack` | Yes | Update a pack and append an audit event. |
 | `list_relay_packs` | No | Read persisted workspace state. |
@@ -379,8 +391,8 @@ MCP tools:
 | `/api/packs` | `GET` list and `POST` create relay packs. |
 | `/api/packs/[id]` | `GET`, `PATCH`, and `DELETE` one pack. |
 | `/api/audit` | Audit events plus chain verification result. |
-| `/api/skills/[id]` | Public skill profile JSON. |
-| `/api/skills/[id]/skill.md` | Metadata-only Markdown preview. |
+| `/api/skills/[id]` | Exact public skill JSON plus canonical human/agent copy bundle. |
+| `/api/skills/[id]/markdown` | Metadata-only Markdown copy bundle. |
 | `/api/mcp` | JSON-RPC `initialize`, `tools/list`, and `tools/call`. |
 | `/api/openapi.json` | Machine-readable REST contract. |
 | `public/mcp.json` | Client-ready MCP configuration. |
@@ -389,8 +401,10 @@ Key implementation files:
 
 - `src/lib/types.ts` — normalized catalog, harness, pack, and MCP types.
 - `src/lib/catalog.ts` — upstream normalization, caching, and sealed fallback.
+- `src/lib/skill-copy.ts` — canonical Markdown, JSON, source, and agent-payload serialization.
 - `src/lib/engine.ts` — deterministic score, compatibility paths, and analysis seal.
 - `src/lib/store.ts` — Neon schema, CRUD, seed behavior, and audit replay.
+- `src/components/copy-button.tsx` — accessible Clipboard API/fallback controls and Copy Rail.
 - `src/app/api/mcp/route.ts` — agent tool boundary.
 - `src/app/globals.css` — paper/ink identity, texture, motion, and responsive system.
 
