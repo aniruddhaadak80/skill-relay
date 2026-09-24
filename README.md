@@ -4,14 +4,14 @@
 
 ### Route one public agent skill to every runtime.
 
-[![Live app](https://img.shields.io/badge/live-skill--relay-2f5cff?style=flat-square)](https://skill-relay.vercel.app)
+[![Live app](https://img.shields.io/badge/live-skill--relay-2f5cff?style=flat-square)](https://skill-relay-tau.vercel.app)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34d399?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-ff6b3d?style=flat-square)](https://nextjs.org)
 [![Neon](https://img.shields.io/badge/persistence-Neon-22d3ee?style=flat-square)](https://neon.tech)
 [![Public feeds](https://img.shields.io/badge/feeds-live%20%2B%20sealed%20fallback-fbbf24?style=flat-square)](#-data-boundary)
 [![MCP](https://img.shields.io/badge/MCP-JSON--RPC-a78bfa?style=flat-square)](#-agent-interface)
 
-[Live App](https://skill-relay.vercel.app) · [API](https://skill-relay.vercel.app/api/openapi.json) · [MCP](https://skill-relay.vercel.app/api/mcp) · [Issues](https://github.com/aniruddhaadak80/skill-relay/issues)
+[Live App](https://skill-relay-tau.vercel.app) · [API](https://skill-relay-tau.vercel.app/api/openapi.json) · [MCP](https://skill-relay-tau.vercel.app/api/mcp) · [Issues](https://github.com/aniruddhaadak80/skill-relay/issues)
 
 </div>
 
@@ -286,24 +286,24 @@ Never commit `.env.local`, Neon credentials, or Vercel tokens.
 
 ## 🔌 API
 
-Base URL: `https://skill-relay.vercel.app`
+Base URL: `https://skill-relay-tau.vercel.app`
 
 ### Health
 
 ```bash
-curl https://skill-relay.vercel.app/api/health
+curl https://skill-relay-tau.vercel.app/api/health
 ```
 
 ### Search the public index
 
 ```bash
-curl "https://skill-relay.vercel.app/api/catalog?q=debugging&limit=10"
+curl "https://skill-relay-tau.vercel.app/api/catalog?q=debugging&limit=10"
 ```
 
 ### Score a skill
 
 ```bash
-curl -X POST https://skill-relay.vercel.app/api/engine \
+curl -X POST https://skill-relay-tau.vercel.app/api/engine \
   -H "content-type: application/json" \
   -d '{"task":"review a pull request safely","skillId":"code-review","harnesses":["Codex","Claude Code"]}'
 ```
@@ -313,20 +313,20 @@ The response includes `score`, `recommendation`, `factors`, `compatibility`, and
 ### Mutation proof: create → read back
 
 ```bash
-curl -X POST https://skill-relay.vercel.app/api/packs \
+curl -X POST https://skill-relay-tau.vercel.app/api/packs \
   -H "content-type: application/json" \
   -d '{"name":"My review relay","task":"Review a pull request safely","selectedSkillId":"mattpocock/skills/code-review","selectedSkillName":"code-review","harnesses":["Codex","Claude Code","OpenCode"]}'
 
-curl https://skill-relay.vercel.app/api/packs/<returned-id>
+curl https://skill-relay-tau.vercel.app/api/packs/<returned-id>
 ```
 
 Update and delete use `PATCH` and `DELETE` on `/api/packs/<id>`. Every mutation appends an audit event; `GET /api/audit` replays the chain.
 
 ### OpenAPI
 
-- [`/api/openapi.json`](https://skill-relay.vercel.app/api/openapi.json)
-- [`/api/feed`](https://skill-relay.vercel.app/api/feed) — cached public feed
-- [`/api/skills/<slug>/skill.md`](https://skill-relay.vercel.app/api/skills/frontend-design/skill.md) — metadata-only preview
+- [`/api/openapi.json`](https://skill-relay-tau.vercel.app/api/openapi.json)
+- [`/api/feed`](https://skill-relay-tau.vercel.app/api/feed) — cached public feed
+- [`/api/skills/<slug>/skill.md`](https://skill-relay-tau.vercel.app/api/skills/frontend-design/skill.md) — metadata-only preview
 
 ## Agent setup
 
@@ -344,7 +344,7 @@ Example client configuration:
   "mcpServers": {
     "skill-relay": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://skill-relay.vercel.app/api/mcp"]
+      "args": ["-y", "mcp-remote", "https://skill-relay-tau.vercel.app/api/mcp"]
     }
   }
 }

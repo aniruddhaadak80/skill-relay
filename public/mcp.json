@@ -2,7 +2,7 @@
   "mcpServers": {
     "skill-relay": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://skill-relay.vercel.app/api/mcp"]
+      "args": ["-y", "mcp-remote", "https://skill-relay-tau.vercel.app/api/mcp"]
     }
   }
 }
