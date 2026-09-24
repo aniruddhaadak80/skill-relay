@@ -17,6 +17,12 @@ type HuggingFaceResponse = {
   rows?: Array<{ row?: Record<string, unknown> }>;
 };
 
+type CacheEntry<T> = { expires: number; value: T };
+const catalogCache = new Map<string, CacheEntry<CatalogResponse>>();
+const recentSkillCache = new Map<string, CacheEntry<SkillRecord>>();
+const skillCache = new Map<string, CacheEntry<SkillRecord | null>>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -95,11 +101,33 @@ async function fetchJson<T>(url: string, revalidate: number): Promise<T> {
   return (await response.json()) as T;
 }
 
+function cacheCatalog(key: string, value: CatalogResponse): CatalogResponse {
+  catalogCache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
+  for (const skill of value.items) {
+    const expiry = Date.now() + CACHE_TTL_MS;
+    recentSkillCache.set(skill.id.toLowerCase(), { expires: expiry, value: skill });
+    recentSkillCache.set(skill.slug.toLowerCase(), { expires: expiry, value: skill });
+  }
+  return value;
+}
+
+function recentSkill(reference: string): SkillRecord | null {
+  const entry = recentSkillCache.get(reference.toLowerCase());
+  if (!entry || entry.expires < Date.now()) {
+    if (entry) recentSkillCache.delete(reference.toLowerCase());
+    return null;
+  }
+  return entry.value;
+}
+
 export async function getCatalog(options: { query?: string; limit?: number; offset?: number; harnesses?: Harness[] } = {}): Promise<CatalogResponse> {
   const query = options.query?.trim() || "";
   const limit = Math.min(Math.max(options.limit || 48, 1), 96);
   const offset = Math.max(options.offset || 0, 0);
   const harnesses = options.harnesses || ["Claude Code", "Codex", "OpenClaw", "Hermes Agent", "OpenCode", "Gemini CLI", "Cursor"];
+  const cacheKey = `${query}|${limit}|${offset}|${harnesses.join(",")}`;
+  const cached = catalogCache.get(cacheKey);
+  if (cached && cached.expires >= Date.now()) return cached.value;
   const liveItems: SkillRecord[] = [];
   let total = CATALOG_TOTAL;
   let sourceKind: SourceKind = query ? "skills.sh" : "claudskills";
@@ -147,23 +175,44 @@ export async function getCatalog(options: { query?: string; limit?: number; offs
     sourceLabel = "sealed offline fallback";
     live = false;
     fallbackReason = fallbackReason || "Live sources were unavailable; showing sealed offline records.";
-    return { items: fallback.slice(0, limit).map((skill) => withCompatibility(skill, harnesses)), total: CATALOG_TOTAL, source: sourceKind, sourceLabel, live, fetchedAt: new Date().toISOString(), fallbackReason };
+    return cacheCatalog(cacheKey, { items: fallback.slice(0, limit).map((skill) => withCompatibility(skill, harnesses)), total: CATALOG_TOTAL, source: sourceKind, sourceLabel, live, fetchedAt: new Date().toISOString(), fallbackReason });
   }
 
   const unique = new Map<string, SkillRecord>();
   for (const skill of liveItems) unique.set(skill.id, skill);
   const items = Array.from(unique.values()).slice(0, limit).map((skill) => withCompatibility(skill, harnesses));
-  return { items, total, source: sourceKind, sourceLabel, live, fetchedAt: new Date().toISOString(), fallbackReason };
+  return cacheCatalog(cacheKey, { items, total, source: sourceKind, sourceLabel, live, fetchedAt: new Date().toISOString(), fallbackReason });
 }
 
 export async function getSkillBySlug(slug: string, harnesses?: Harness[]): Promise<SkillRecord | null> {
-  const normalized = decodeURIComponent(slug).trim().toLowerCase();
+  let normalized: string;
+  try {
+    normalized = decodeURIComponent(slug).trim().toLowerCase();
+  } catch {
+    return null;
+  }
   if (!normalized) return null;
-  const result = await getCatalog({ query: normalized, limit: 96, harnesses });
-  const exact = result.items.find((item) => item.slug.toLowerCase() === normalized || item.id.toLowerCase().endsWith(`/${normalized}`));
-  if (exact) return exact;
-  const fallback = cloneFallbackSkills().find((item) => item.slug.toLowerCase() === normalized || item.id.toLowerCase().endsWith(`/${normalized}`));
-  return fallback ? withCompatibility(fallback, harnesses || [...HARNESSES]) : null;
+  const targets = harnesses || [...HARNESSES];
+  const cacheKey = `${normalized}|${targets.join(",")}`;
+  const cached = skillCache.get(cacheKey);
+  if (cached && cached.expires >= Date.now()) return cached.value ? withCompatibility(cached.value, targets) : null;
+  const recent = recentSkill(normalized) || recentSkill(normalized.split("/").pop() || normalized);
+  if (recent) {
+    const resolved = withCompatibility(recent, targets);
+    skillCache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, value: resolved });
+    return resolved;
+  }
+  const lookup = normalized.includes("/") ? normalized.split("/").pop() || normalized : normalized;
+  const result = await getCatalog({ query: lookup, limit: 96, harnesses: targets });
+  const exact = result.items.find((item) => item.id.toLowerCase() === normalized || item.slug.toLowerCase() === lookup || item.id.toLowerCase().endsWith(`/${lookup}`));
+  if (exact) {
+    skillCache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, value: exact });
+    return exact;
+  }
+  const fallback = cloneFallbackSkills().find((item) => item.id.toLowerCase() === normalized || item.slug.toLowerCase() === lookup || item.id.toLowerCase().endsWith(`/${lookup}`));
+  const resolved = fallback ? withCompatibility(fallback, targets) : null;
+  skillCache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, value: resolved });
+  return resolved;
 }
 
 export function catalogSourceInfo() {
