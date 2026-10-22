@@ -96,7 +96,7 @@ function compatibilityFactor(compatibility: Compatibility[]): ScoreFactor {
 
 function riskFactor(skill: SkillRecord, task: string): ScoreFactor {
   const text = `${task} ${skill.description} ${skill.name}`.toLowerCase();
-  const risky = ["credential", "secret", "shell", "sudo", "production", "payment", "delete", "credential"].filter((word) => text.includes(word)).length;
+  const risky = ["credential", "secret", "shell", "sudo", "production", "payment", "delete"].filter((word) => text.includes(word)).length;
   const value = clamp(100 - risky * 16, 35, 100);
   return {
     label: "Review surface",
@@ -156,7 +156,11 @@ export function scoreSkill(skill: SkillRecord, task: string, selectedHarnesses: 
     riskFactor(skill, task),
   ];
   const weighted = factors.reduce((sum, factor) => sum + factor.value * factor.weight, 0);
-  const score = clamp(Math.round(weighted / 100));
+  // The published weights add up to 110, so the weighted sum has to be divided
+  // by their total. Dividing by 100 inflated every score by 10% and made it
+  // disagree with the itemised factors shown next to it.
+  const weightTotal = factors.reduce((sum, factor) => sum + factor.weight, 0);
+  const score = clamp(Math.round(weighted / weightTotal));
   const recommendation = score >= 82 ? "strong-fit" : score >= 68 ? "good-fit" : "review-first";
   const payload = { task, skillId: skill.id, score, factors, compatibility };
   return { score, recommendation, factors, compatibility, seal: analysisSeal(payload), sealScope: "analysis-only" };
